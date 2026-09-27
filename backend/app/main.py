@@ -22,6 +22,7 @@ def read_root():
     return {"message": "Welcome to the Diabetes Report Analyzer API"}
 
 from app.services.ocr_service import process_document
+from app.services.extraction_service import extract_parameters
 import traceback
 
 @app.post("/api/analyze")
@@ -37,13 +38,17 @@ async def analyze_report(file: UploadFile = File(...)):
         file_bytes = await file.read()
         raw_text = process_document(file_bytes, file.filename)
         
-        # Phases 5-9 will go here later
+        # Phase 5: Extract structured parameters
+        extracted_data = extract_parameters(raw_text)
+        
+        # Phases 6-9 will go here later
         
         return {
             "status": "success", 
             "filename": file.filename, 
             "raw_text": raw_text,
-            "message": "OCR completed successfully"
+            "extracted_data": extracted_data,
+            "message": "OCR and extraction completed successfully"
         }
     except Exception as e:
         print(f"Error in analyze_report: {traceback.format_exc()}")

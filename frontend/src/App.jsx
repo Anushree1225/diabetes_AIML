@@ -8,6 +8,7 @@ function App() {
   const [file, setFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState(null);
+  const [extractedData, setExtractedData] = useState(null);
   const [uploadError, setUploadError] = useState(null);
   const fileInputRef = useRef(null);
 
@@ -25,6 +26,7 @@ function App() {
     setIsUploading(true);
     setUploadError(null);
     setUploadResult(null);
+    setExtractedData(null);
 
     const formData = new FormData();
     formData.append('file', file);
@@ -39,6 +41,7 @@ function App() {
       
       if (data.status === 'success') {
         setUploadResult(data.raw_text);
+        setExtractedData(data.extracted_data);
         setActiveTab('results');
       } else {
         setUploadError(data.message || 'An error occurred during upload.');
@@ -127,9 +130,44 @@ function App() {
             <div className="results-section">
               <h2>Analysis Results</h2>
               {uploadResult ? (
-                <div className="ocr-results">
-                  <h3>Extracted Text:</h3>
-                  <pre className="ocr-text">{uploadResult}</pre>
+                <div className="results-container">
+                  {extractedData && extractedData.length > 0 && (
+                    <div className="extracted-data">
+                      <h3>Extracted Parameters:</h3>
+                      <table className="data-table">
+                        <thead>
+                          <tr>
+                            <th>Parameter</th>
+                            <th>Value</th>
+                            <th>Unit</th>
+                            <th>Reference Range</th>
+                            <th>Extraction Status</th>
+                            <th>Original Text</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {extractedData.map((param, index) => (
+                            <tr key={index}>
+                              <td><strong>{param.name}</strong></td>
+                              <td>{param.value}</td>
+                              <td>{param.unit}</td>
+                              <td>{param.reference_range || '-'}</td>
+                              <td>
+                                <span className={`status-badge ${param.extraction_status}`}>
+                                  {param.extraction_status}
+                                </span>
+                              </td>
+                              <td className="original-text">{param.original_name}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  <div className="ocr-results">
+                    <h3>Raw OCR Text:</h3>
+                    <pre className="ocr-text">{uploadResult}</pre>
+                  </div>
                 </div>
               ) : (
                 <p className="placeholder-text">Upload a report to see findings, XAI, and ML assessment here.</p>
