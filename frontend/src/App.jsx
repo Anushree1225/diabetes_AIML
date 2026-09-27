@@ -9,6 +9,7 @@ function App() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState(null);
   const [extractedData, setExtractedData] = useState(null);
+  const [mlAssessment, setMlAssessment] = useState(null);
   const [uploadError, setUploadError] = useState(null);
   const fileInputRef = useRef(null);
 
@@ -27,6 +28,7 @@ function App() {
     setUploadError(null);
     setUploadResult(null);
     setExtractedData(null);
+    setMlAssessment(null);
 
     const formData = new FormData();
     formData.append('file', file);
@@ -42,6 +44,7 @@ function App() {
       if (data.status === 'success') {
         setUploadResult(data.raw_text);
         setExtractedData(data.extracted_data);
+        setMlAssessment(data.ml_assessment);
         setActiveTab('results');
       } else {
         setUploadError(data.message || 'An error occurred during upload.');
@@ -170,6 +173,24 @@ function App() {
                       </table>
                     </div>
                   )}
+                  
+                  {mlAssessment && (
+                    <div className={`ml-assessment-section ${mlAssessment.connected ? 'real-model' : 'demo-model'}`}>
+                      <h3>ML Model Assessment</h3>
+                      {!mlAssessment.connected && (
+                        <div className="warning-banner">
+                          ⚠️ <strong>DEVELOPMENT MODE:</strong> Real ML model is not connected. 
+                          The final predictive model will be plugged in here.
+                        </div>
+                      )}
+                      <div className="assessment-details">
+                        <p><strong>Status:</strong> {mlAssessment.connected ? 'Connected' : 'Disconnected (Demo)'}</p>
+                        <p><strong>Prediction:</strong> {mlAssessment.prediction}</p>
+                        <p><strong>Message:</strong> {mlAssessment.message}</p>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="ocr-results">
                     <h3>Raw OCR Text:</h3>
                     <pre className="ocr-text">{uploadResult}</pre>
