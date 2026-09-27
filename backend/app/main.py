@@ -23,6 +23,7 @@ def read_root():
 
 from app.services.ocr_service import process_document
 from app.services.extraction_service import extract_parameters
+from app.services.status_service import analyze_status
 import traceback
 
 @app.post("/api/analyze")
@@ -41,14 +42,17 @@ async def analyze_report(file: UploadFile = File(...)):
         # Phase 5: Extract structured parameters
         extracted_data = extract_parameters(raw_text)
         
-        # Phases 6-9 will go here later
+        # Phase 6: Analyze Reference Ranges and Status
+        extracted_data = analyze_status(extracted_data)
+        
+        # Phases 7-9 will go here later
         
         return {
             "status": "success", 
             "filename": file.filename, 
             "raw_text": raw_text,
             "extracted_data": extracted_data,
-            "message": "OCR and extraction completed successfully"
+            "message": "OCR, extraction, and status analysis completed successfully"
         }
     except Exception as e:
         print(f"Error in analyze_report: {traceback.format_exc()}")

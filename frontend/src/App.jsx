@@ -141,6 +141,7 @@ function App() {
                             <th>Value</th>
                             <th>Unit</th>
                             <th>Reference Range</th>
+                            <th>Clinical Status</th>
                             <th>Extraction Status</th>
                             <th>Original Text</th>
                           </tr>
@@ -152,6 +153,11 @@ function App() {
                               <td>{param.value}</td>
                               <td>{param.unit}</td>
                               <td>{param.reference_range || '-'}</td>
+                              <td>
+                                <span className={`status-badge stat-${param.status?.toLowerCase().replace(/[^a-z]/g, '')}`}>
+                                  {param.status || '-'}
+                                </span>
+                              </td>
                               <td>
                                 <span className={`status-badge ${param.extraction_status}`}>
                                   {param.extraction_status}
