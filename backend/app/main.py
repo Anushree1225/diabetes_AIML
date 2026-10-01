@@ -26,6 +26,7 @@ from app.services.extraction_service import extract_parameters
 from app.services.status_service import analyze_status
 from app.services.ml_service import run_ml_assessment, ml_service_instance
 from app.services.xai_service import run_xai_analysis
+from app.services.llm_service import run_llm_explanation
 import traceback
 
 @app.post("/api/analyze")
@@ -54,7 +55,8 @@ async def analyze_report(file: UploadFile = File(...)):
         features = ml_service_instance.prepare_features(extracted_data)
         xai_assessment = run_xai_analysis(ml_service_instance.model, features, ml_assessment)
         
-        # Phase 9 will go here later
+        # Phase 9: LLM Explanation Layer
+        llm_assessment = run_llm_explanation(extracted_data, ml_assessment, xai_assessment)
         
         return {
             "status": "success", 
@@ -63,6 +65,7 @@ async def analyze_report(file: UploadFile = File(...)):
             "extracted_data": extracted_data,
             "ml_assessment": ml_assessment,
             "xai_assessment": xai_assessment,
+            "llm_assessment": llm_assessment,
             "message": "Pipeline completed successfully"
         }
     except Exception as e:

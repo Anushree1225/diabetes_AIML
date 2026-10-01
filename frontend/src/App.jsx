@@ -11,6 +11,7 @@ function App() {
   const [extractedData, setExtractedData] = useState(null);
   const [mlAssessment, setMlAssessment] = useState(null);
   const [xaiAssessment, setXaiAssessment] = useState(null);
+  const [llmAssessment, setLlmAssessment] = useState(null);
   const [uploadError, setUploadError] = useState(null);
   const fileInputRef = useRef(null);
 
@@ -31,6 +32,7 @@ function App() {
     setExtractedData(null);
     setMlAssessment(null);
     setXaiAssessment(null);
+    setLlmAssessment(null);
 
     const formData = new FormData();
     formData.append('file', file);
@@ -48,6 +50,7 @@ function App() {
         setExtractedData(data.extracted_data);
         setMlAssessment(data.ml_assessment);
         setXaiAssessment(data.xai_assessment);
+        setLlmAssessment(data.llm_assessment);
         setActiveTab('results');
       } else {
         setUploadError(data.message || 'An error occurred during upload.');
@@ -213,6 +216,25 @@ function App() {
                       ) : (
                         <div className="error-banner">
                            <p>XAI Error: {xaiAssessment.message}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {llmAssessment && (
+                    <div className="llm-section">
+                      <h3>AI Explanation</h3>
+                      {llmAssessment.status === 'success' ? (
+                        <div className="llm-content">
+                          <pre className="markdown-text">{llmAssessment.explanation}</pre>
+                        </div>
+                      ) : llmAssessment.status === 'unavailable' ? (
+                        <div className="info-banner">
+                          <p><strong>AI Explanation Unavailable:</strong> {llmAssessment.message}</p>
+                        </div>
+                      ) : (
+                        <div className="error-banner">
+                          <p><strong>AI Error:</strong> {llmAssessment.message}</p>
                         </div>
                       )}
                     </div>
