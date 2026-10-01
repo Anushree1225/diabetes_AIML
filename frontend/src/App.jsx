@@ -10,6 +10,7 @@ function App() {
   const [uploadResult, setUploadResult] = useState(null);
   const [extractedData, setExtractedData] = useState(null);
   const [mlAssessment, setMlAssessment] = useState(null);
+  const [xaiAssessment, setXaiAssessment] = useState(null);
   const [uploadError, setUploadError] = useState(null);
   const fileInputRef = useRef(null);
 
@@ -29,6 +30,7 @@ function App() {
     setUploadResult(null);
     setExtractedData(null);
     setMlAssessment(null);
+    setXaiAssessment(null);
 
     const formData = new FormData();
     formData.append('file', file);
@@ -45,6 +47,7 @@ function App() {
         setUploadResult(data.raw_text);
         setExtractedData(data.extracted_data);
         setMlAssessment(data.ml_assessment);
+        setXaiAssessment(data.xai_assessment);
         setActiveTab('results');
       } else {
         setUploadError(data.message || 'An error occurred during upload.');
@@ -188,6 +191,30 @@ function App() {
                         <p><strong>Prediction:</strong> {mlAssessment.prediction}</p>
                         <p><strong>Message:</strong> {mlAssessment.message}</p>
                       </div>
+                    </div>
+                  )}
+
+                  {xaiAssessment && (
+                    <div className="xai-section">
+                      <h3>Explainable AI (XAI)</h3>
+                      {xaiAssessment.status === 'unavailable' ? (
+                        <div className="info-banner">
+                          <p><strong>What is XAI?</strong> Explainable AI helps you understand which test results most influenced the ML prediction.</p>
+                          <p><em>{xaiAssessment.message}</em></p>
+                          <p className="subtext">Explanations will appear here once the real model is connected.</p>
+                        </div>
+                      ) : xaiAssessment.status === 'success' ? (
+                        <div className="xai-contributions">
+                          <p>{xaiAssessment.message}</p>
+                          <div className="placeholder-chart">
+                            Chart ready for real feature contributions.
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="error-banner">
+                           <p>XAI Error: {xaiAssessment.message}</p>
+                        </div>
+                      )}
                     </div>
                   )}
 

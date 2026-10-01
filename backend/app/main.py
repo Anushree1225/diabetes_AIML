@@ -24,7 +24,8 @@ def read_root():
 from app.services.ocr_service import process_document
 from app.services.extraction_service import extract_parameters
 from app.services.status_service import analyze_status
-from app.services.ml_service import run_ml_assessment
+from app.services.ml_service import run_ml_assessment, ml_service_instance
+from app.services.xai_service import run_xai_analysis
 import traceback
 
 @app.post("/api/analyze")
@@ -49,7 +50,11 @@ async def analyze_report(file: UploadFile = File(...)):
         # Phase 7: ML Integration Layer
         ml_assessment = run_ml_assessment(extracted_data)
         
-        # Phases 8-9 will go here later
+        # Phase 8: XAI Layer
+        features = ml_service_instance.prepare_features(extracted_data)
+        xai_assessment = run_xai_analysis(ml_service_instance.model, features, ml_assessment)
+        
+        # Phase 9 will go here later
         
         return {
             "status": "success", 
@@ -57,7 +62,8 @@ async def analyze_report(file: UploadFile = File(...)):
             "raw_text": raw_text,
             "extracted_data": extracted_data,
             "ml_assessment": ml_assessment,
-            "message": "OCR, extraction, status analysis, and ML integration completed successfully"
+            "xai_assessment": xai_assessment,
+            "message": "Pipeline completed successfully"
         }
     except Exception as e:
         print(f"Error in analyze_report: {traceback.format_exc()}")
