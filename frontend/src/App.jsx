@@ -15,6 +15,12 @@ function App() {
   const [uploadError, setUploadError] = useState(null);
   const fileInputRef = useRef(null);
 
+  // Phase 10: Chatbot states
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatInput, setChatInput] = useState('');
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const chatScrollRef = useRef(null);
+
   const handleFileSelect = (e) => {
     const selectedFile = e.target.files[0];
     if (selectedFile) {
@@ -33,6 +39,7 @@ function App() {
     setMlAssessment(null);
     setXaiAssessment(null);
     setLlmAssessment(null);
+    setChatMessages([]);
 
     const formData = new FormData();
     formData.append('file', file);
@@ -60,6 +67,58 @@ function App() {
       console.error(err);
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  const handleSendMessage = async (e) => {
+    e.preventDefault();
+    if (!chatInput.trim()) return;
+
+    const userMessage = { role: 'user', content: chatInput };
+    const newChatHistory = [...chatMessages, userMessage];
+    
+    setChatMessages(newChatHistory);
+    setChatInput('');
+    setIsChatLoading(true);
+
+    const reportContext = {
+      extracted_data: extractedData,
+      ml_assessment: mlAssessment,
+      xai_assessment: xaiAssessment,
+      llm_assessment: llmAssessment
+    };
+
+    try {
+      const response = await fetch('http://localhost:8000/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: userMessage.content,
+          report_context: reportContext,
+          history: chatMessages
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (data.status === 'success') {
+        setChatMessages([...newChatHistory, { role: 'assistant', content: data.response }]);
+      } else if (data.status === 'unavailable') {
+        setChatMessages([...newChatHistory, { role: 'assistant', content: `⚠️ ${data.response}` }]);
+      } else {
+        setChatMessages([...newChatHistory, { role: 'assistant', content: `❌ Error: ${data.response || 'Unknown error'}` }]);
+      }
+    } catch (err) {
+      setChatMessages([...newChatHistory, { role: 'assistant', content: '❌ Failed to connect to the server.' }]);
+      console.error(err);
+    } finally {
+      setIsChatLoading(false);
+      // Scroll to bottom
+      setTimeout(() => {
+        if (chatScrollRef.current) {
+          chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+        }
+      }, 100);
     }
   };
 
@@ -254,7 +313,49 @@ function App() {
           {activeTab === 'chat' && (
             <div className="chat-section">
               <h2>Ask Questions</h2>
-              <p className="placeholder-text">Chat with the AI about your report findings.</p>
+              {!extractedData ? (
+                <p className="placeholder-text">Please upload a laboratory report first to start a conversation.</p>
+              ) : (
+                <div className="chat-container">
+                  <div className="chat-context-banner">
+                    <p>💡 The assistant is answering based on your uploaded report: <strong>{file?.name}</strong></p>
+                  </div>
+                  
+                  <div className="chat-messages" ref={chatScrollRef}>
+                    {chatMessages.length === 0 ? (
+                      <p className="chat-empty">Send a message to ask about your laboratory results, e.g., "What does my HbA1c level mean?"</p>
+                    ) : (
+                      chatMessages.map((msg, index) => (
+                        <div key={index} className={`chat-message ${msg.role}`}>
+                          <div className="message-bubble">
+                            <pre className="message-content">{msg.content}</pre>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                    {isChatLoading && (
+                      <div className="chat-message assistant">
+                        <div className="message-bubble loading">
+                          <span className="dot-typing"></span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <form className="chat-input-area" onSubmit={handleSendMessage}>
+                    <input
+                      type="text"
+                      placeholder="Ask about your report..."
+                      value={chatInput}
+                      onChange={(e) => setChatInput(e.target.value)}
+                      disabled={isChatLoading}
+                    />
+                    <button type="submit" disabled={isChatLoading || !chatInput.trim()}>
+                      Send
+                    </button>
+                  </form>
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -16,6 +16,7 @@ app.add_middleware(
 class ChatRequest(BaseModel):
     message: str
     report_context: dict
+    history: list = []
 
 @app.get("/")
 def read_root():
@@ -26,7 +27,7 @@ from app.services.extraction_service import extract_parameters
 from app.services.status_service import analyze_status
 from app.services.ml_service import run_ml_assessment, ml_service_instance
 from app.services.xai_service import run_xai_analysis
-from app.services.llm_service import run_llm_explanation
+from app.services.llm_service import run_llm_explanation, run_chat
 import traceback
 
 @app.post("/api/analyze")
@@ -74,5 +75,9 @@ async def analyze_report(file: UploadFile = File(...)):
 
 @app.post("/api/chat")
 def chat_with_report(request: ChatRequest):
-    # Placeholder for Phase 10
-    return {"status": "success", "response": "Chatbot endpoint ready"}
+    try:
+        result = run_chat(request.message, request.report_context, request.history)
+        return result
+    except Exception as e:
+        print(f"Error in chat endpoint: {traceback.format_exc()}")
+        return {"status": "error", "response": str(e)}
