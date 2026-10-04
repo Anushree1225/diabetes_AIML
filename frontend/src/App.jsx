@@ -1,4 +1,5 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
+import ReactMarkdown from 'react-markdown'
 import './App.css'
 
 function App() {
@@ -120,15 +121,23 @@ function App() {
     }
   };
 
-  const handleSendMessage = async (e) => {
-    e.preventDefault();
-    if (!chatInput.trim()) return;
+  const handleSendMessage = async (e, retryMessage = null) => {
+    if (e) e.preventDefault();
+    const content = retryMessage || chatInput;
+    if (!content.trim()) return;
 
-    const userMessage = { role: 'user', content: chatInput };
-    const newChatHistory = [...chatMessages, userMessage];
+    const userMessage = { role: 'user', content: content };
+    let newChatHistory = chatMessages;
     
-    setChatMessages(newChatHistory);
-    setChatInput('');
+    // Only append if it's a new message (not a retry of the last message)
+    if (!retryMessage) {
+      newChatHistory = [...chatMessages, userMessage];
+      setChatMessages(newChatHistory);
+    }
+    
+    if (!retryMessage) {
+      setChatInput('');
+    }
     setIsChatLoading(true);
 
     const reportContext = {
@@ -139,27 +148,38 @@ function App() {
     };
 
     try {
+      // The API expects 'history' without the current message if it appends it, or with it if it doesn't.
+      // Based on typical implementations, we send history as-is and the new message.
+      // To fix the stale response bug: we ensure we send the truly latest history excluding the current query,
+      // which is exactly `chatMessages` before we appended `userMessage` (if it's a new request) or 
+      // the history without the failed user message if it's a retry.
+      const historyToSend = retryMessage ? chatMessages.slice(0, -1) : chatMessages;
+
       const response = await fetch(`${API_BASE}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: userMessage.content,
           report_context: reportContext,
-          history: chatMessages
+          history: historyToSend
         }),
       });
 
       const data = await response.json();
       
       if (data.status === 'success') {
-        setChatMessages([...newChatHistory, { role: 'assistant', content: data.response }]);
+        setChatMessages(prev => {
+          // Remove any previous error message if this was a retry
+          const cleanedPrev = retryMessage ? prev.filter(m => !m.isError) : prev;
+          return [...cleanedPrev, { role: 'assistant', content: data.response }];
+        });
       } else if (data.status === 'unavailable') {
-        setChatMessages([...newChatHistory, { role: 'assistant', content: `⚠️ ${data.response}` }]);
+        setChatMessages(prev => [...prev, { role: 'assistant', content: `AI is temporarily busy. Please try again in a moment.`, isError: true, retryContent: userMessage.content }]);
       } else {
-        setChatMessages([...newChatHistory, { role: 'assistant', content: `❌ Error: ${data.response || 'Unknown error'}` }]);
+        setChatMessages(prev => [...prev, { role: 'assistant', content: `❌ Error: ${data.response || 'Unknown error'}` }]);
       }
     } catch (err) {
-      setChatMessages([...newChatHistory, { role: 'assistant', content: '❌ Failed to connect to the server.' }]);
+      setChatMessages(prev => [...prev, { role: 'assistant', content: 'AI is temporarily busy. Please try again in a moment.', isError: true, retryContent: userMessage.content }]);
       console.error(err);
     } finally {
       setIsChatLoading(false);
@@ -318,11 +338,11 @@ function App() {
                         <tbody>
                           {extractedData.map((param, index) => (
                             <tr key={index}>
-                              <td><strong>{param.name}</strong></td>
-                              <td>{param.value}</td>
-                              <td>{param.unit}</td>
-                              <td>{param.reference_range || '-'}</td>
-                              <td>
+                              <td data-label="Parameter"><strong>{param.name}</strong></td>
+                              <td data-label="Value">{param.value}</td>
+                              <td data-label="Unit">{param.unit}</td>
+                              <td data-label="Reference Range">{param.reference_range || '-'}</td>
+                              <td data-label="Clinical Status">
                                 <span className={`status-badge stat-${param.status?.toLowerCase().replace(/[^a-z]/g, '')}`}>
                                   {param.status || '-'}
                                 </span>
@@ -347,11 +367,16 @@ function App() {
                           <p><strong>Error:</strong> {mlAssessment.message}</p>
                         </div>
                       ) : (
-                        <div className="assessment-details">
+                          <div className="assessment-details">
                           <p><strong>Status:</strong> {mlAssessment.connected ? 'Connected (REAL)' : 'Disconnected (Demo)'}</p>
                           <p><strong>Assessment:</strong> {mlAssessment.message}</p>
                           {mlAssessment.confidence !== null && (
-                            <p><strong>Probability:</strong> {(mlAssessment.confidence * 100).toFixed(1)}%</p>
+                            <div className="ml-progress-section">
+                              <p><strong>Probability:</strong> {(mlAssessment.confidence * 100).toFixed(1)}%</p>
+                              <div className="ml-progress-container">
+                                <div className="ml-progress-fill" style={{ width: `${Math.min(mlAssessment.confidence * 100, 100)}%` }}></div>
+                              </div>
+                            </div>
                           )}
                         </div>
                       )}
@@ -366,12 +391,21 @@ function App() {
                           <p><strong>XAI Unavailable:</strong> {xaiAssessment.message}</p>
                         </div>
                       ) : xaiAssessment.status === 'success' ? (
-                        <div className="xai-contributions">
+                          <div className="xai-contributions">
                           <p>{xaiAssessment.message}</p>
                           <ul className="contributions-list">
                             {xaiAssessment.contributions?.map((c, i) => (
-                              <li key={i}>
-                                <strong>{c.feature}:</strong> {c.value.toFixed(4)}
+                              <li key={i} className="shap-item">
+                                <div className="shap-label">
+                                  <span>{c.feature}</span>
+                                  <span>{c.value > 0 ? '+' : ''}{c.value.toFixed(4)}</span>
+                                </div>
+                                <div className="shap-bar-container">
+                                  <div 
+                                    className={`shap-bar-fill ${c.value > 0 ? 'positive' : 'negative'}`} 
+                                    style={{ width: `${Math.min(Math.abs(c.value) * 100, 100)}%` }}
+                                  ></div>
+                                </div>
                               </li>
                             ))}
                           </ul>
@@ -388,8 +422,8 @@ function App() {
                     <div className="llm-section">
                       <h3>AI Explanation</h3>
                       {llmAssessment.status === 'success' ? (
-                        <div className="llm-content">
-                          <pre className="markdown-text">{llmAssessment.explanation}</pre>
+                          <div className="llm-content">
+                          <ReactMarkdown className="markdown-text">{llmAssessment.explanation}</ReactMarkdown>
                         </div>
                       ) : llmAssessment.status === 'unavailable' ? (
                         <div className="info-banner">
@@ -426,8 +460,17 @@ function App() {
                     ) : (
                       chatMessages.map((msg, index) => (
                         <div key={index} className={`chat-message ${msg.role}`}>
-                          <div className="message-bubble">
-                            <pre className="message-content">{msg.content}</pre>
+                            <div className="message-bubble">
+                            {msg.role === 'assistant' ? (
+                              <ReactMarkdown className="message-content">{msg.content}</ReactMarkdown>
+                            ) : (
+                              <div className="message-content">{msg.content}</div>
+                            )}
+                            {msg.isError && (
+                              <button className="chat-retry-btn" onClick={() => handleSendMessage(null, msg.retryContent)}>
+                                Retry
+                              </button>
+                            )}
                           </div>
                         </div>
                       ))

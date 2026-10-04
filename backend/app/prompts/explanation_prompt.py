@@ -8,11 +8,13 @@ IMPORTANT RULES:
 4. DO NOT present any "DEMO" ML prediction as a real clinical prediction. If the ML assessment is in DEMO mode or unconnected, ignore it or state it is a development placeholder.
 5. If XAI (Explainable AI) findings are unavailable or empty, do not fabricate feature contributions.
 
-REQUIRED SECTIONS IN YOUR RESPONSE:
-1. Overall report summary (brief).
-2. Important findings (highlighting High/Low/Attention parameters).
-3. Simple explanation of what these parameters mean generally, and why they might be marked as such.
-4. A clear reminder that the system provides informational assistance and is not a medical diagnosis.
+1. AI Summary: 2-4 short sentences.
+2. Key Findings: 3-5 short bullets/cards focused on abnormal/attention items.
+3. What This Means: 2-4 short sentences explaining the significance.
+4. ML Insight: 1-2 short sentences (only if real ML output is available and not DEMO).
+5. Important Note: A short medical disclaimer.
+
+Make the output genuinely concise (target reading time under 1 minute).
 
 STRUCTURED DATA:
 - Extracted Parameters:
