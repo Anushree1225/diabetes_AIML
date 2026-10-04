@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import './App.css'
 
 function App() {
+  const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
   const [activeTab, setActiveTab] = useState('upload');
   
   // Phase 4 states
@@ -53,7 +54,7 @@ function App() {
     formData.append('file', file);
 
     try {
-      const response = await fetch('http://localhost:8000/api/extract', {
+      const response = await fetch(`${API_BASE}/api/extract`, {
         method: 'POST',
         body: formData,
       });
@@ -90,7 +91,7 @@ function App() {
     setUploadError(null);
     
     try {
-      const response = await fetch('http://localhost:8000/api/assess', {
+      const response = await fetch(`${API_BASE}/api/assess`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -138,7 +139,7 @@ function App() {
     };
 
     try {
-      const response = await fetch('http://localhost:8000/api/chat', {
+      const response = await fetch(`${API_BASE}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
