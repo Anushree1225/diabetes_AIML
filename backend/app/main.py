@@ -1,6 +1,24 @@
-from fastapi import FastAPI, UploadFile, File
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Load .env from the backend directory (next to requirements.txt).
+# This must run before any service module is imported so that
+# os.getenv("GEMINI_API_KEY") etc. are populated at class-init time.
+_env_path = Path(__file__).resolve().parent.parent / ".env"
+load_dotenv(dotenv_path=_env_path, override=False)
+
+# Confirm (without revealing the value) whether the key was found.
+_key_present = bool(os.getenv("GEMINI_API_KEY"))
+print(f"[config] .env loaded from: {_env_path}")
+print(f"[config] GEMINI_API_KEY present: {_key_present}")
+print(f"[config] GEMINI_MODEL : {os.getenv('GEMINI_MODEL', 'gemini-2.5-flash')} (default if unset)")
+
+from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from typing import Optional
+import json
 
 app = FastAPI(title="Diabetes Report Analyzer API")
 
@@ -30,8 +48,8 @@ from app.services.xai_service import run_xai_analysis
 from app.services.llm_service import run_llm_explanation, run_chat
 import traceback
 
-@app.post("/api/analyze")
-async def analyze_report(file: UploadFile = File(...)):
+@app.post("/api/extract")
+async def extract_report(file: UploadFile = File(...)):
     try:
         allowed_extensions = {".pdf", ".jpg", ".jpeg", ".png"}
         import os
@@ -39,38 +57,60 @@ async def analyze_report(file: UploadFile = File(...)):
         if ext not in allowed_extensions:
             return {"status": "error", "message": f"Unsupported file type. Allowed types: {', '.join(allowed_extensions)}"}
 
-        # Phase 4: Read and OCR the document
         file_bytes = await file.read()
         raw_text = process_document(file_bytes, file.filename)
         
-        # Phase 5: Extract structured parameters
         extracted_data = extract_parameters(raw_text)
-        
-        # Phase 6: Analyze Reference Ranges and Status
         extracted_data = analyze_status(extracted_data)
         
-        # Phase 7: ML Integration Layer
-        ml_assessment = run_ml_assessment(extracted_data)
-        
-        # Phase 8: XAI Layer
-        features = ml_service_instance.prepare_features(extracted_data)
-        xai_assessment = run_xai_analysis(ml_service_instance.model, features, ml_assessment)
-        
-        # Phase 9: LLM Explanation Layer
-        llm_assessment = run_llm_explanation(extracted_data, ml_assessment, xai_assessment)
-        
+        # Try to extract demographics
+        import re
+        demo = {}
+        age_match = re.search(r'\bage\s*[:\-]?\s*(\d{1,3})\b', raw_text, re.IGNORECASE)
+        sex_match = re.search(r'\b(sex|gender)\s*[:\-]?\s*(male|female|m|f)\b', raw_text, re.IGNORECASE)
+        if age_match:
+            demo['age'] = age_match.group(1)
+        if sex_match:
+            s = sex_match.group(2).lower()
+            demo['sex'] = "Male" if s in ['male', 'm'] else "Female"
+            
         return {
-            "status": "success", 
-            "filename": file.filename, 
+            "status": "success",
+            "filename": file.filename,
             "raw_text": raw_text,
             "extracted_data": extracted_data,
-            "ml_assessment": ml_assessment,
-            "xai_assessment": xai_assessment,
-            "llm_assessment": llm_assessment,
-            "message": "Pipeline completed successfully"
+            "demographics": demo
         }
     except Exception as e:
-        print(f"Error in analyze_report: {traceback.format_exc()}")
+        print(f"Error in extract_report: {traceback.format_exc()}")
+        return {"status": "error", "message": str(e)}
+
+class AssessRequest(BaseModel):
+    extracted_data: list
+    demographics: dict
+    raw_text: str = ""
+    filename: str = ""
+
+@app.post("/api/assess")
+def assess_report(req: AssessRequest):
+    try:
+        demographics = req.demographics
+        if "sex" in demographics and demographics["sex"]:
+            demographics["sex_male"] = 1 if demographics["sex"].lower() == "male" else 0
+            
+        ml_assessment = run_ml_assessment(req.extracted_data, demographics)
+        features = ml_service_instance.prepare_features(req.extracted_data, demographics)
+        xai_assessment = run_xai_analysis(ml_service_instance.model, features, ml_assessment)
+        llm_assessment = run_llm_explanation(req.extracted_data, ml_assessment, xai_assessment)
+        
+        return {
+            "status": "success",
+            "ml_assessment": ml_assessment,
+            "xai_assessment": xai_assessment,
+            "llm_assessment": llm_assessment
+        }
+    except Exception as e:
+        print(f"Error in assess_report: {traceback.format_exc()}")
         return {"status": "error", "message": str(e)}
 
 @app.post("/api/chat")

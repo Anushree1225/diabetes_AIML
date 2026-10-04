@@ -2,8 +2,14 @@ fastapi>=0.115.0
 uvicorn>=0.32.0
 python-multipart>=0.0.9
 pydantic>=2.9.2
+python-dotenv>=1.0.0
 pytesseract
 pdf2image
 opencv-python-headless
 Pillow
 numpy
+scikit-learn==1.6.1
+pandas
+shap
+joblib
+google-genai
