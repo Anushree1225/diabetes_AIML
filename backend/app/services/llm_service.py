@@ -17,7 +17,7 @@ except ImportError:
     print("[llm_service] openai package not found – chatbot will be unavailable. "
           "Add 'openai>=1.0.0' to requirements.txt and redeploy.")
 
-from app.prompts.explanation_prompt import EXPLANATION_PROMPT_TEMPLATE
+from app.prompts.explanation_prompt import EXPLANATION_PROMPT_TEMPLATE, EXPLANATION_FALLBACK_PROMPT_TEMPLATE
 from app.prompts.chat_prompt import CHAT_SYSTEM_PROMPT
 
 
@@ -70,6 +70,42 @@ class LLMService:
             }
 
         except Exception as e:
+            error_str = str(e).lower()
+            is_transient = any(code in error_str for code in ("429", "503", "quota", "rate limit", "overloaded", "unavailable"))
+
+            if is_transient and GROQ_AVAILABLE:
+                # ── Groq fallback for transient Gemini errors ──────────────────
+                groq_key = os.getenv("GROQ_API_KEY")
+                groq_model = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
+                if groq_key:
+                    try:
+                        fallback_client = GroqOpenAI(
+                            api_key=groq_key,
+                            base_url="https://api.groq.com/openai/v1"
+                        )
+                        fallback_prompt = EXPLANATION_FALLBACK_PROMPT_TEMPLATE.format(
+                            extracted_data=json.dumps(extracted_data, indent=2),
+                            ml_assessment=json.dumps(ml_assessment, indent=2),
+                            xai_assessment=json.dumps(xai_assessment, indent=2)
+                        )
+                        completion = fallback_client.chat.completions.create(
+                            model=groq_model,
+                            messages=[{"role": "user", "content": fallback_prompt}],
+                        )
+                        print(f"[llm_service] Gemini transient error ({e}); AI Summary served by Groq fallback.")
+                        return {
+                            "status": "success",
+                            "message": "Explanation generated (Groq fallback — Gemini temporarily unavailable).",
+                            "explanation": completion.choices[0].message.content
+                        }
+                    except Exception as fallback_e:
+                        print(f"[llm_service] Groq fallback also failed: {fallback_e}")
+                        return {
+                            "status": "error",
+                            "message": f"Gemini unavailable and Groq fallback failed: {str(fallback_e)}",
+                            "explanation": None
+                        }
+
             return {
                 "status": "error",
                 "message": f"LLM generation failed: {str(e)}",
