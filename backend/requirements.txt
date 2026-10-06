@@ -13,3 +13,4 @@ pandas
 shap
 joblib
 google-genai
+openai>=1.0.0
