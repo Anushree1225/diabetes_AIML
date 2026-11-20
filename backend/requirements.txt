@@ -14,3 +14,4 @@ shap
 joblib
 google-genai
 openai>=1.0.0
+pypdf>=5.0.0

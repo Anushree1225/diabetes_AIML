@@ -48,6 +48,7 @@ from app.services.status_service import analyze_status
 from app.services.ml_service import run_ml_assessment, ml_service_instance
 from app.services.xai_service import run_xai_analysis
 from app.services.llm_service import run_llm_explanation, run_chat
+from starlette.concurrency import run_in_threadpool
 import traceback
 
 @app.post("/api/extract")
@@ -61,9 +62,11 @@ async def extract_report(file: UploadFile = File(...)):
             return {"status": "error", "message": f"Unsupported file type. Allowed types: {', '.join(allowed_extensions)}"}
 
         file_bytes = await file.read()
+        if not file_bytes or len(file_bytes.strip() if isinstance(file_bytes, (bytes, bytearray)) else file_bytes) == 0:
+            return {"status": "error", "message": "Uploaded file is empty. Please upload a valid laboratory report."}
 
         t_ocr_start = time.perf_counter()
-        raw_text = process_document(file_bytes, file.filename)
+        raw_text = await run_in_threadpool(process_document, file_bytes, file.filename)
         ocr_ms = (time.perf_counter() - t_ocr_start) * 1000
         
         t_param_start = time.perf_counter()
@@ -78,11 +81,16 @@ async def extract_report(file: UploadFile = File(...)):
         import re
         demo = {}
         age_match = re.search(r'\bage\s*[:\-]?\s*(\d{1,3})\b', raw_text, re.IGNORECASE)
-        sex_match = re.search(r'\b(sex|gender)\s*[:\-]?\s*(male|female|m|f)\b', raw_text, re.IGNORECASE)
+        if not age_match:
+            age_match = re.search(r'\b(\d{1,3})\s*(?:years|yrs|yo|y/o)\b', raw_text, re.IGNORECASE)
         if age_match:
             demo['age'] = age_match.group(1)
+
+        sex_match = re.search(r'\b(?:sex|gender)\s*[:\-]?\s*(male|female|m|f)\b', raw_text, re.IGNORECASE)
+        if not sex_match:
+            sex_match = re.search(r'\b(male|female)\b', raw_text, re.IGNORECASE)
         if sex_match:
-            s = sex_match.group(2).lower()
+            s = sex_match.group(1).lower()
             demo['sex'] = "Male" if s in ['male', 'm'] else "Female"
             
         total_ms = (time.perf_counter() - t_start) * 1000

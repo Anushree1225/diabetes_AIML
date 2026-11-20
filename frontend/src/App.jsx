@@ -58,9 +58,17 @@ function App() {
         body: formData,
       });
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonErr) {
+        if (!response.ok) {
+          throw new Error(`Server returned HTTP ${response.status} (${response.statusText || 'Error'}).`);
+        }
+        throw new Error('Failed to parse server response. Please try again.');
+      }
       
-      if (data.status === 'success') {
+      if (response.ok && data.status === 'success') {
         setUploadResult(data.raw_text);
         setExtractedData(data.extracted_data);
         setDemographics({
@@ -70,11 +78,16 @@ function App() {
         });
         setShowDemographics(true);
       } else {
-        setUploadError(data.message || 'An error occurred during upload.');
+        setUploadError(data.message || `Upload failed with status ${response.status}.`);
       }
     } catch (err) {
-      setUploadError('Failed to connect to the server. Is the backend running?');
-      console.error(err);
+      const isNetworkError = err.name === 'TypeError' && err.message.toLowerCase().includes('fetch');
+      if (isNetworkError) {
+        setUploadError('Unable to reach the backend server. Please verify your internet connection or check if the backend service is waking up.');
+      } else {
+        setUploadError(err.message || 'An error occurred during upload.');
+      }
+      console.error('Upload error:', err);
     } finally {
       setIsUploading(false);
     }

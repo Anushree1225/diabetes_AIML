@@ -4,3 +4,9 @@ __pycache__/
 node_modules/
 venv/
 *.joblib
+
+# Local test samples — do not commit to Git
+test_samples/
+
+# Local test scripts
+backend/test_extraction_local.py
