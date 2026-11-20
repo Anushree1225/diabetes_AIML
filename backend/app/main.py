@@ -1,4 +1,5 @@
 import os
+import time
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -51,6 +52,7 @@ import traceback
 
 @app.post("/api/extract")
 async def extract_report(file: UploadFile = File(...)):
+    t_start = time.perf_counter()
     try:
         allowed_extensions = {".pdf", ".jpg", ".jpeg", ".png"}
         import os
@@ -59,10 +61,18 @@ async def extract_report(file: UploadFile = File(...)):
             return {"status": "error", "message": f"Unsupported file type. Allowed types: {', '.join(allowed_extensions)}"}
 
         file_bytes = await file.read()
+
+        t_ocr_start = time.perf_counter()
         raw_text = process_document(file_bytes, file.filename)
+        ocr_ms = (time.perf_counter() - t_ocr_start) * 1000
         
+        t_param_start = time.perf_counter()
         extracted_data = extract_parameters(raw_text)
+        param_ms = (time.perf_counter() - t_param_start) * 1000
+
+        t_status_start = time.perf_counter()
         extracted_data = analyze_status(extracted_data)
+        range_ms = (time.perf_counter() - t_status_start) * 1000
         
         # Try to extract demographics
         import re
@@ -75,6 +85,9 @@ async def extract_report(file: UploadFile = File(...)):
             s = sex_match.group(2).lower()
             demo['sex'] = "Male" if s in ['male', 'm'] else "Female"
             
+        total_ms = (time.perf_counter() - t_start) * 1000
+        print(f"[timing] /api/extract - Document OCR: {ocr_ms:.2f}ms | Parameter Extraction: {param_ms:.2f}ms | Reference-range Analysis: {range_ms:.2f}ms | Total Time: {total_ms:.2f}ms")
+
         return {
             "status": "success",
             "filename": file.filename,
@@ -83,7 +96,8 @@ async def extract_report(file: UploadFile = File(...)):
             "demographics": demo
         }
     except Exception as e:
-        print(f"Error in extract_report: {traceback.format_exc()}")
+        total_ms = (time.perf_counter() - t_start) * 1000
+        print(f"[timing] /api/extract failed after {total_ms:.2f}ms: {traceback.format_exc()}")
         return {"status": "error", "message": str(e)}
 
 class AssessRequest(BaseModel):
@@ -94,15 +108,27 @@ class AssessRequest(BaseModel):
 
 @app.post("/api/assess")
 def assess_report(req: AssessRequest):
+    t_start = time.perf_counter()
     try:
         demographics = req.demographics
         if "sex" in demographics and demographics["sex"]:
             demographics["sex_male"] = 1 if demographics["sex"].lower() == "male" else 0
             
+        t_ml_start = time.perf_counter()
         ml_assessment = run_ml_assessment(req.extracted_data, demographics)
         features = ml_service_instance.prepare_features(req.extracted_data, demographics)
+        ml_ms = (time.perf_counter() - t_ml_start) * 1000
+
+        t_shap_start = time.perf_counter()
         xai_assessment = run_xai_analysis(ml_service_instance.model, features, ml_assessment)
+        shap_ms = (time.perf_counter() - t_shap_start) * 1000
+
+        t_llm_start = time.perf_counter()
         llm_assessment = run_llm_explanation(req.extracted_data, ml_assessment, xai_assessment)
+        llm_ms = (time.perf_counter() - t_llm_start) * 1000
+
+        total_ms = (time.perf_counter() - t_start) * 1000
+        print(f"[timing] /api/assess - ML Prediction: {ml_ms:.2f}ms | SHAP Analysis: {shap_ms:.2f}ms | LLM Generation: {llm_ms:.2f}ms | Total Time: {total_ms:.2f}ms")
         
         return {
             "status": "success",
@@ -111,7 +137,8 @@ def assess_report(req: AssessRequest):
             "llm_assessment": llm_assessment
         }
     except Exception as e:
-        print(f"Error in assess_report: {traceback.format_exc()}")
+        total_ms = (time.perf_counter() - t_start) * 1000
+        print(f"[timing] /api/assess failed after {total_ms:.2f}ms: {traceback.format_exc()}")
         return {"status": "error", "message": str(e)}
 
 @app.post("/api/chat")
