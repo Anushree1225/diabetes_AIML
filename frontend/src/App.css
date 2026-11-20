@@ -410,6 +410,20 @@ body {
   margin: 0 0 16px 0;
   color: var(--text-main);
 }
+.section-title h3 {
+  margin: 0;
+  font-size: inherit;
+  font-weight: inherit;
+  color: inherit;
+  line-height: 1.2;
+}
+.section-title svg {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  color: var(--primary);
+  display: block;
+}
 .section-desc {
   font-size: 0.9rem;
   color: var(--text-muted);
@@ -418,18 +432,32 @@ body {
 
 /* LLM Card */
 .llm-card {
-  background: var(--primary-light);
-  padding: 20px;
-  border-radius: var(--radius-lg);
-  color: var(--text-main);
+  background: var(--surface);
+  border: 1px solid var(--border-light);
+  border-left: 3px solid var(--primary);
+  padding: 16px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  text-align: left;
 }
 .md-content {
-  font-size: 0.95rem;
-  line-height: 1.5;
+  font-size: 0.9rem;
+  line-height: 1.55;
 }
 .md-content p:first-child { margin-top: 0; }
 .md-content p:last-child { margin-bottom: 0; }
-.md-content h1, .md-content h2, .md-content h3 { font-size: 1.1rem; margin: 1em 0 0.5em; }
+.md-content p { margin: 0 0 0.6em 0; }
+.md-content h1, .md-content h2, .md-content h3 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin: 0.8em 0 0.35em;
+  color: var(--text-main);
+}
+.md-content ul, .md-content ol {
+  padding-left: 1.2em;
+  margin: 0.4em 0 0.6em;
+}
+.md-content li { margin-bottom: 0.25em; }
 
 /* Param Cards (Needs Attention) */
 .param-grid {
